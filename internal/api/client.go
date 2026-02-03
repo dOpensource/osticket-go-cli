@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -172,29 +171,19 @@ func (c *Client) doRequest(req Request) (*Response, error) {
 	return &apiResp, nil
 }
 
-// doGetRequest performs a GET API request with query parameters
+// doGetRequest performs a GET API request with JSON body
 func (c *Client) doGetRequest(req Request) (*Response, error) {
-	// Build URL with query parameters
-	baseURL, err := url.Parse(c.BaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse base URL: %w", err)
-	}
-
-	// Encode the request as JSON and pass as query param
-	reqJSON, err := json.Marshal(req)
+	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	q := baseURL.Query()
-	q.Set("request", string(reqJSON))
-	baseURL.RawQuery = q.Encode()
-
-	httpReq, err := http.NewRequest("GET", baseURL.String(), nil)
+	httpReq, err := http.NewRequest("GET", c.BaseURL, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("apikey", c.APIKey)
 
 	resp, err := c.HTTPClient.Do(httpReq)
@@ -220,10 +209,33 @@ func (c *Client) doGetRequest(req Request) (*Response, error) {
 	return &apiResp, nil
 }
 
-// GetTicket gets a specific ticket by ID or number
-// Note: osTicket API requires POST as it reads from php://input
+// doGetRequestRaw performs a GET API request and returns raw response bytes
+func (c *Client) doGetRequestRaw(req Request) ([]byte, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("GET", c.BaseURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("apikey", c.APIKey)
+
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
+}
+
+// GetTicket gets a specific ticket by ID or number (uses GET)
 func (c *Client) GetTicket(id string) (*TicketData, error) {
-	resp, err := c.doRequest(Request{
+	resp, err := c.doGetRequest(Request{
 		Query:      "ticket",
 		Condition:  "specific",
 		Parameters: map[string]interface{}{"id": id},
@@ -268,6 +280,15 @@ func (c *Client) GetTicket(id string) (*TicketData, error) {
 	}
 
 	return nil, fmt.Errorf("failed to parse ticket data: unexpected response format")
+}
+
+// GetTicketRaw gets a specific ticket and returns raw API response
+func (c *Client) GetTicketRaw(id string) ([]byte, error) {
+	return c.doGetRequestRaw(Request{
+		Query:      "ticket",
+		Condition:  "specific",
+		Parameters: map[string]interface{}{"id": id},
+	})
 }
 
 // GetTicketsByStatus gets tickets by status

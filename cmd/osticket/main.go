@@ -149,28 +149,30 @@ func ticketCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			client := getClient()
-			jsonOut, _ := cmd.Flags().GetBool("json")
+			rawOut, _ := cmd.Flags().GetBool("raw")
 
+			// Raw output - return exact API response
+			if rawOut {
+				raw, err := client.GetTicketRaw(args[0])
+				if err != nil {
+					fmt.Fprintln(os.Stderr, red("Error:"), err)
+					os.Exit(1)
+				}
+				fmt.Println(string(raw))
+				return
+			}
+
+			// JSON output (parsed and formatted)
 			data, err := client.GetTicket(args[0])
 			if err != nil {
 				fmt.Fprintln(os.Stderr, red("Error:"), err)
 				os.Exit(1)
 			}
 
-			if jsonOut {
-				printJSON(data)
-				return
-			}
-
-			if len(data.Tickets) == 0 {
-				fmt.Println(yellow("No ticket found"))
-				return
-			}
-
-			displayTickets(data.Tickets)
+			printJSON(data)
 		},
 	}
-	getCmd.Flags().Bool("json", false, "Output as JSON")
+	getCmd.Flags().Bool("raw", false, "Output raw API response")
 	cmd.AddCommand(getCmd)
 
 	// ticket search
