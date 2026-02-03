@@ -95,17 +95,24 @@ func configCmd() *cobra.Command {
 			fmt.Println("\n" + cyan("Configuration:"))
 			url := config.GetBaseURL()
 			key := config.GetAPIKey()
+			urlSource, keySource := config.GetConfigSource()
+
+			urlDisplay := url
 			if url == "" {
-				url = "(not set)"
+				urlDisplay = "(not set)"
 			}
+			keyDisplay := key
 			if key == "" {
-				key = "(not set)"
+				keyDisplay = "(not set)"
 			} else if len(key) > 12 {
-				key = key[:8] + "..." + key[len(key)-4:]
+				keyDisplay = key[:8] + "..." + key[len(key)-4:]
 			}
-			fmt.Printf("  Base URL: %s\n", url)
-			fmt.Printf("  API Key:  %s\n", key)
-			fmt.Printf("  Config file: %s\n\n", config.GetConfigPath())
+			fmt.Printf("  Base URL: %s [%s]\n", urlDisplay, urlSource)
+			fmt.Printf("  API Key:  %s [%s]\n", keyDisplay, keySource)
+			fmt.Printf("  Config file: %s\n", config.GetConfigPath())
+			fmt.Printf("\n  Environment variables:\n")
+			fmt.Printf("    %s\n", config.EnvBaseURL)
+			fmt.Printf("    %s\n\n", config.EnvAPIKey)
 		},
 	}
 	cmd.AddCommand(showCmd)

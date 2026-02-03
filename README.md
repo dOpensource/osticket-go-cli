@@ -27,20 +27,34 @@ Download the appropriate binary for your platform from the releases page.
 
 ## Configuration
 
-Before using the CLI, configure it with your osTicket API URL and API key:
+The CLI can be configured via environment variables or a config file. Environment variables take precedence.
+
+### Environment Variables
+
+```bash
+export OSTICKET_BASE_URL="https://your-osticket.com/ost_wbs/"
+export OSTICKET_API_KEY="YOUR_API_KEY"
+```
+
+### Config File
 
 ```bash
 # Set the API URL and key
 osticket config set --url https://your-osticket.com/ost_wbs/ --key YOUR_API_KEY
 
-# View current configuration
+# View current configuration (shows source: env or config)
 osticket config show
 
 # Clear configuration
 osticket config clear
 ```
 
-Configuration is stored in `~/.osticket-cli/config.yaml`
+Configuration file is stored in `~/.osticket-cli/config.yaml`
+
+### Priority
+
+1. Environment variables (`OSTICKET_BASE_URL`, `OSTICKET_API_KEY`)
+2. Config file (`~/.osticket-cli/config.yaml`)
 
 ## Usage
 

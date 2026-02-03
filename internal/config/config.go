@@ -10,6 +10,12 @@ import (
 
 var cfg *viper.Viper
 
+// Environment variable names
+const (
+	EnvBaseURL = "OSTICKET_BASE_URL"
+	EnvAPIKey  = "OSTICKET_API_KEY"
+)
+
 func init() {
 	cfg = viper.New()
 	cfg.SetConfigName("config")
@@ -32,6 +38,10 @@ func init() {
 	// Set defaults
 	cfg.SetDefault("base_url", "")
 	cfg.SetDefault("api_key", "")
+
+	// Bind environment variables
+	cfg.BindEnv("base_url", EnvBaseURL)
+	cfg.BindEnv("api_key", EnvAPIKey)
 
 	// Read config file if it exists
 	if err := cfg.ReadInConfig(); err != nil {
@@ -64,13 +74,21 @@ func Save() error {
 	return cfg.WriteConfigAs(configPath)
 }
 
-// GetBaseURL returns the API base URL
+// GetBaseURL returns the API base URL (env var takes precedence)
 func GetBaseURL() string {
+	// Check environment variable first
+	if envVal := os.Getenv(EnvBaseURL); envVal != "" {
+		return envVal
+	}
 	return cfg.GetString("base_url")
 }
 
-// GetAPIKey returns the API key
+// GetAPIKey returns the API key (env var takes precedence)
 func GetAPIKey() string {
+	// Check environment variable first
+	if envVal := os.Getenv(EnvAPIKey); envVal != "" {
+		return envVal
+	}
 	return cfg.GetString("api_key")
 }
 
@@ -100,4 +118,25 @@ func Clear() error {
 func GetConfigPath() string {
 	homeDir, _ := os.UserHomeDir()
 	return filepath.Join(homeDir, ".osticket-cli", "config.yaml")
+}
+
+// GetConfigSource returns where each config value is coming from
+func GetConfigSource() (baseURLSource, apiKeySource string) {
+	if os.Getenv(EnvBaseURL) != "" {
+		baseURLSource = "env:" + EnvBaseURL
+	} else if cfg.GetString("base_url") != "" {
+		baseURLSource = "config"
+	} else {
+		baseURLSource = "not set"
+	}
+
+	if os.Getenv(EnvAPIKey) != "" {
+		apiKeySource = "env:" + EnvAPIKey
+	} else if cfg.GetString("api_key") != "" {
+		apiKeySource = "config"
+	} else {
+		apiKeySource = "not set"
+	}
+
+	return
 }
