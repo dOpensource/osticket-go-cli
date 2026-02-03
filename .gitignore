@@ -1,0 +1,16 @@
+# Binary
+osticket
+osticket.exe
+osticket-*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Test
+coverage.out
