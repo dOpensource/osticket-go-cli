@@ -731,8 +731,8 @@ func (c *Client) SearchTicketsByEmail(email string) (*SimpleTicketResponse, *Use
 
 	user := userData.Users[0]
 
-	// Get all tickets
-	allTickets, err := c.GetTicketsByStatus(0)
+	// Get all tickets using date range (wider compatibility)
+	allTickets, err := c.GetTicketsByDateRange("2000-01-01", "2099-12-31")
 	if err != nil {
 		return nil, &user, err
 	}
@@ -740,9 +740,16 @@ func (c *Client) SearchTicketsByEmail(email string) (*SimpleTicketResponse, *Use
 	// Filter by user ID
 	var filtered []map[string]interface{}
 	for _, ticket := range allTickets.Tickets {
-		// Check user_id field (could be float64 from JSON)
-		if userID, ok := ticket["user_id"].(float64); ok {
-			if int(userID) == user.UserID {
+		// Check user_id field (could be float64 or string from JSON)
+		switch uid := ticket["user_id"].(type) {
+		case float64:
+			if int(uid) == user.UserID {
+				filtered = append(filtered, ticket)
+			}
+		case string:
+			var uidInt int
+			fmt.Sscanf(uid, "%d", &uidInt)
+			if uidInt == user.UserID {
 				filtered = append(filtered, ticket)
 			}
 		}

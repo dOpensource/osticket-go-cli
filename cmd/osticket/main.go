@@ -221,7 +221,7 @@ func ticketCmd() *cobra.Command {
 					fmt.Println("=== User Response ===")
 					fmt.Println(string(raw))
 					
-					raw2, err := client.GetTicketsByStatusRaw(0)
+					raw2, err := client.GetTicketsByDateRangeRaw("2000-01-01", "2099-12-31")
 					if err != nil {
 						fmt.Fprintln(os.Stderr, red("Error getting tickets:"), err)
 						os.Exit(1)
