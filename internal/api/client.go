@@ -524,9 +524,15 @@ func (c *Client) CreateTicket(params CreateTicketParams) (int, error) {
 		return 0, err
 	}
 
+	// API returns ticket ID as string or int
 	var ticketID int
 	if err := json.Unmarshal(resp.Data, &ticketID); err != nil {
-		return 0, fmt.Errorf("failed to parse ticket ID: %w", err)
+		// Try as string
+		var ticketIDStr string
+		if err2 := json.Unmarshal(resp.Data, &ticketIDStr); err2 != nil {
+			return 0, fmt.Errorf("failed to parse ticket ID: %w", err)
+		}
+		fmt.Sscanf(ticketIDStr, "%d", &ticketID)
 	}
 
 	return ticketID, nil
@@ -649,9 +655,15 @@ func (c *Client) CreateUser(params CreateUserParams) (int, error) {
 		return 0, err
 	}
 
+	// API returns user ID as string or int
 	var userID int
 	if err := json.Unmarshal(resp.Data, &userID); err != nil {
-		return 0, fmt.Errorf("failed to parse user ID: %w", err)
+		// Try as string
+		var userIDStr string
+		if err2 := json.Unmarshal(resp.Data, &userIDStr); err2 != nil {
+			return 0, fmt.Errorf("failed to parse user ID: %w", err)
+		}
+		fmt.Sscanf(userIDStr, "%d", &userID)
 	}
 
 	return userID, nil

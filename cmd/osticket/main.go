@@ -446,7 +446,7 @@ func ticketCmd() *cobra.Command {
 	closeCmd.Flags().Int("staff-id", 0, "Staff ID")
 	closeCmd.Flags().String("username", "", "Username")
 	closeCmd.Flags().Int("status", 3, "Status ID (default: 3 for closed)")
-	closeCmd.Flags().Int("team", 0, "Team ID")
+	closeCmd.Flags().Int("team", 1, "Team ID (default: 1)")
 	closeCmd.Flags().Int("dept", 1, "Department ID")
 	closeCmd.Flags().Int("topic", 1, "Topic ID")
 	closeCmd.Flags().Bool("json", false, "Output as JSON")
