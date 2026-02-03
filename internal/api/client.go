@@ -258,6 +258,30 @@ func (c *Client) doGetRequestRaw(req Request) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// doPostRequestRaw performs a POST API request and returns raw response bytes
+func (c *Client) doPostRequestRaw(req Request) ([]byte, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("POST", c.BaseURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("apikey", c.APIKey)
+
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
+}
+
 // SimpleTicketResponse is a flat ticket response for JSON output
 type SimpleTicketResponse struct {
 	Total   int                      `json:"total"`
@@ -402,9 +426,9 @@ func (c *Client) GetTicketRaw(id string) ([]byte, error) {
 	})
 }
 
-// GetTicketsByStatus gets tickets by status (uses GET)
+// GetTicketsByStatus gets tickets by status (uses POST)
 func (c *Client) GetTicketsByStatus(status int) (*SimpleTicketResponse, error) {
-	raw, err := c.doGetRequestRaw(Request{
+	raw, err := c.doPostRequestRaw(Request{
 		Query:      "ticket",
 		Condition:  "all",
 		Sort:       "status",
@@ -435,9 +459,9 @@ func (c *Client) GetTicketsByDateRange(startDate, endDate string) (*SimpleTicket
 	return parseTicketsResponse(raw)
 }
 
-// GetTicketsByStatusRaw gets tickets by status and returns raw response
+// GetTicketsByStatusRaw gets tickets by status and returns raw response (POST)
 func (c *Client) GetTicketsByStatusRaw(status int) ([]byte, error) {
-	return c.doGetRequestRaw(Request{
+	return c.doPostRequestRaw(Request{
 		Query:      "ticket",
 		Condition:  "all",
 		Sort:       "status",
