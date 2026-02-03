@@ -426,9 +426,9 @@ func (c *Client) GetTicketRaw(id string) ([]byte, error) {
 	})
 }
 
-// GetTicketsByStatus gets tickets by status (uses POST)
+// GetTicketsByStatus gets tickets by status (uses GET)
 func (c *Client) GetTicketsByStatus(status int) (*SimpleTicketResponse, error) {
-	raw, err := c.doPostRequestRaw(Request{
+	raw, err := c.doGetRequestRaw(Request{
 		Query:      "ticket",
 		Condition:  "all",
 		Sort:       "status",
@@ -459,9 +459,9 @@ func (c *Client) GetTicketsByDateRange(startDate, endDate string) (*SimpleTicket
 	return parseTicketsResponse(raw)
 }
 
-// GetTicketsByStatusRaw gets tickets by status and returns raw response (POST)
+// GetTicketsByStatusRaw gets tickets by status and returns raw response (GET)
 func (c *Client) GetTicketsByStatusRaw(status int) ([]byte, error) {
-	return c.doPostRequestRaw(Request{
+	return c.doGetRequestRaw(Request{
 		Query:      "ticket",
 		Condition:  "all",
 		Sort:       "status",
