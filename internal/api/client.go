@@ -91,9 +91,34 @@ type UserData struct {
 
 // User represents a single user
 type User struct {
-	UserID  int    `json:"user_id"`
+	UserID  int    `json:"-"` // Parsed manually due to API returning string or int
 	Name    string `json:"name"`
 	Created string `json:"created"`
+}
+
+// UnmarshalJSON custom unmarshaler for User to handle user_id as string or int
+func (u *User) UnmarshalJSON(data []byte) error {
+	type Alias User
+	aux := &struct {
+		UserID interface{} `json:"user_id"`
+		*Alias
+	}{
+		Alias: (*Alias)(u),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	
+	// Handle user_id as string or number
+	switch v := aux.UserID.(type) {
+	case float64:
+		u.UserID = int(v)
+	case string:
+		fmt.Sscanf(v, "%d", &u.UserID)
+	case int:
+		u.UserID = v
+	}
+	return nil
 }
 
 // DepartmentData represents department response data
