@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -171,19 +172,29 @@ func (c *Client) doRequest(req Request) (*Response, error) {
 	return &apiResp, nil
 }
 
-// doGetRequest performs a GET API request with JSON body
+// doGetRequest performs a GET API request with query parameters
 func (c *Client) doGetRequest(req Request) (*Response, error) {
-	body, err := json.Marshal(req)
+	// Build URL with query parameters
+	baseURL, err := url.Parse(c.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse base URL: %w", err)
+	}
+
+	// Encode the request as JSON and pass as query param
+	reqJSON, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	httpReq, err := http.NewRequest("GET", c.BaseURL, bytes.NewBuffer(body))
+	q := baseURL.Query()
+	q.Set("request", string(reqJSON))
+	baseURL.RawQuery = q.Encode()
+
+	httpReq, err := http.NewRequest("GET", baseURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("apikey", c.APIKey)
 
 	resp, err := c.HTTPClient.Do(httpReq)
@@ -209,9 +220,10 @@ func (c *Client) doGetRequest(req Request) (*Response, error) {
 	return &apiResp, nil
 }
 
-// GetTicket gets a specific ticket by ID or number (uses GET)
+// GetTicket gets a specific ticket by ID or number
+// Note: osTicket API requires POST as it reads from php://input
 func (c *Client) GetTicket(id string) (*TicketData, error) {
-	resp, err := c.doGetRequest(Request{
+	resp, err := c.doRequest(Request{
 		Query:      "ticket",
 		Condition:  "specific",
 		Parameters: map[string]interface{}{"id": id},
