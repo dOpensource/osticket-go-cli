@@ -189,13 +189,22 @@ func ticketCmd() *cobra.Command {
 			from, _ := cmd.Flags().GetString("from")
 			to, _ := cmd.Flags().GetString("to")
 
+			// Handle search by number separately (uses GET, returns SimpleTicketResponse)
+			if number != "" {
+				data, err := client.GetTicket(number)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, red("Error:"), err)
+					os.Exit(1)
+				}
+				printJSON(data)
+				return
+			}
+
 			var data *api.TicketData
 			var user *api.User
 			var err error
 
-			if number != "" {
-				data, err = client.GetTicket(number)
-			} else if email != "" {
+			if email != "" {
 				data, user, err = client.SearchTicketsByEmail(email)
 			} else if phone != "" {
 				fmt.Println(yellow("Phone search requires user lookup. Please search by email or ticket number instead."))

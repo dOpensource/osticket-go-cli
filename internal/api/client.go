@@ -233,9 +233,16 @@ func (c *Client) doGetRequestRaw(req Request) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// SimpleTicketResponse is a flat ticket response for JSON output
+type SimpleTicketResponse struct {
+	Total   int                      `json:"total"`
+	Tickets []map[string]interface{} `json:"tickets"`
+}
+
 // GetTicket gets a specific ticket by ID or number (uses GET)
-func (c *Client) GetTicket(id string) (*TicketData, error) {
-	resp, err := c.doGetRequest(Request{
+// Returns tickets as a flat array of individual ticket objects
+func (c *Client) GetTicket(id string) (*SimpleTicketResponse, error) {
+	raw, err := c.doGetRequestRaw(Request{
 		Query:      "ticket",
 		Condition:  "specific",
 		Parameters: map[string]interface{}{"id": id},
@@ -244,42 +251,64 @@ func (c *Client) GetTicket(id string) (*TicketData, error) {
 		return nil, err
 	}
 
-	// Try parsing as TicketData first ([][]Ticket format)
-	var data TicketData
-	if err := json.Unmarshal(resp.Data, &data); err == nil {
-		return &data, nil
+	// Parse the raw response to extract tickets dynamically
+	var rawResp map[string]interface{}
+	if err := json.Unmarshal(raw, &rawResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Try parsing as flat ticket array ([]Ticket format)
-	var flatData struct {
-		Total   int      `json:"total"`
-		Tickets []Ticket `json:"tickets"`
-	}
-	if err := json.Unmarshal(resp.Data, &flatData); err == nil {
-		// Convert flat array to nested format for consistency
-		var nestedTickets [][]Ticket
-		for _, t := range flatData.Tickets {
-			nestedTickets = append(nestedTickets, []Ticket{t})
+	// Check for error status
+	if status, ok := rawResp["status"].(string); ok && status == "Error" {
+		msg := "unknown error"
+		if m, ok := rawResp["message"].(string); ok {
+			msg = m
 		}
-		return &TicketData{
-			Total:   flatData.Total,
-			Tickets: nestedTickets,
-		}, nil
+		return nil, fmt.Errorf("API error: %s", msg)
 	}
 
-	// Try parsing as single ticket object
-	var singleData struct {
-		Total  int    `json:"total"`
-		Ticket Ticket `json:"ticket"`
-	}
-	if err := json.Unmarshal(resp.Data, &singleData); err == nil {
-		return &TicketData{
-			Total:   singleData.Total,
-			Tickets: [][]Ticket{{singleData.Ticket}},
-		}, nil
+	// Extract data field
+	data, ok := rawResp["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid data field in response")
 	}
 
-	return nil, fmt.Errorf("failed to parse ticket data: unexpected response format")
+	// Get total
+	total := 0
+	if t, ok := data["total"].(float64); ok {
+		total = int(t)
+	}
+
+	// Extract tickets - handle various formats
+	var tickets []map[string]interface{}
+
+	if ticketsRaw, ok := data["tickets"]; ok {
+		switch t := ticketsRaw.(type) {
+		case []interface{}:
+			// Could be [][]ticket or []ticket
+			for _, item := range t {
+				switch v := item.(type) {
+				case []interface{}:
+					// Nested array - flatten it
+					for _, ticket := range v {
+						if ticketMap, ok := ticket.(map[string]interface{}); ok {
+							tickets = append(tickets, ticketMap)
+						}
+					}
+				case map[string]interface{}:
+					// Direct ticket object
+					tickets = append(tickets, v)
+				}
+			}
+		case map[string]interface{}:
+			// Single ticket object
+			tickets = append(tickets, t)
+		}
+	}
+
+	return &SimpleTicketResponse{
+		Total:   total,
+		Tickets: tickets,
+	}, nil
 }
 
 // GetTicketRaw gets a specific ticket and returns raw API response
