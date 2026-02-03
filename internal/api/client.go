@@ -133,7 +133,7 @@ type SLA struct {
 	GracePeriod int    `json:"grace_period"`
 }
 
-// doRequest performs the API request
+// doRequest performs the API request (POST)
 func (c *Client) doRequest(req Request) (*Response, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -171,9 +171,47 @@ func (c *Client) doRequest(req Request) (*Response, error) {
 	return &apiResp, nil
 }
 
-// GetTicket gets a specific ticket by ID or number
+// doGetRequest performs a GET API request with JSON body
+func (c *Client) doGetRequest(req Request) (*Response, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("GET", c.BaseURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("apikey", c.APIKey)
+
+	resp, err := c.HTTPClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var apiResp Response
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if apiResp.Status == "Error" {
+		return nil, fmt.Errorf("API error: %s", apiResp.Message)
+	}
+
+	return &apiResp, nil
+}
+
+// GetTicket gets a specific ticket by ID or number (uses GET)
 func (c *Client) GetTicket(id string) (*TicketData, error) {
-	resp, err := c.doRequest(Request{
+	resp, err := c.doGetRequest(Request{
 		Query:      "ticket",
 		Condition:  "specific",
 		Parameters: map[string]interface{}{"id": id},
