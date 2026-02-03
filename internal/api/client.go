@@ -311,6 +311,63 @@ func (c *Client) GetTicket(id string) (*SimpleTicketResponse, error) {
 	}, nil
 }
 
+// parseTicketsResponse parses raw API response into SimpleTicketResponse
+func parseTicketsResponse(raw []byte) (*SimpleTicketResponse, error) {
+	var rawResp map[string]interface{}
+	if err := json.Unmarshal(raw, &rawResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Check for error status
+	if status, ok := rawResp["status"].(string); ok && status == "Error" {
+		msg := "unknown error"
+		if m, ok := rawResp["message"].(string); ok {
+			msg = m
+		}
+		return nil, fmt.Errorf("API error: %s", msg)
+	}
+
+	// Extract data field
+	data, ok := rawResp["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid data field in response")
+	}
+
+	// Get total
+	total := 0
+	if t, ok := data["total"].(float64); ok {
+		total = int(t)
+	}
+
+	// Extract tickets - handle various formats
+	var tickets []map[string]interface{}
+
+	if ticketsRaw, ok := data["tickets"]; ok {
+		switch t := ticketsRaw.(type) {
+		case []interface{}:
+			for _, item := range t {
+				switch v := item.(type) {
+				case []interface{}:
+					for _, ticket := range v {
+						if ticketMap, ok := ticket.(map[string]interface{}); ok {
+							tickets = append(tickets, ticketMap)
+						}
+					}
+				case map[string]interface{}:
+					tickets = append(tickets, v)
+				}
+			}
+		case map[string]interface{}:
+			tickets = append(tickets, t)
+		}
+	}
+
+	return &SimpleTicketResponse{
+		Total:   total,
+		Tickets: tickets,
+	}, nil
+}
+
 // GetTicketRaw gets a specific ticket and returns raw API response
 func (c *Client) GetTicketRaw(id string) ([]byte, error) {
 	return c.doGetRequestRaw(Request{
@@ -320,9 +377,9 @@ func (c *Client) GetTicketRaw(id string) ([]byte, error) {
 	})
 }
 
-// GetTicketsByStatus gets tickets by status
-func (c *Client) GetTicketsByStatus(status int) (*TicketData, error) {
-	resp, err := c.doRequest(Request{
+// GetTicketsByStatus gets tickets by status (uses GET)
+func (c *Client) GetTicketsByStatus(status int) (*SimpleTicketResponse, error) {
+	raw, err := c.doGetRequestRaw(Request{
 		Query:      "ticket",
 		Condition:  "all",
 		Sort:       "status",
@@ -332,17 +389,12 @@ func (c *Client) GetTicketsByStatus(status int) (*TicketData, error) {
 		return nil, err
 	}
 
-	var data TicketData
-	if err := json.Unmarshal(resp.Data, &data); err != nil {
-		return nil, fmt.Errorf("failed to parse ticket data: %w", err)
-	}
-
-	return &data, nil
+	return parseTicketsResponse(raw)
 }
 
-// GetTicketsByDateRange gets tickets by creation date range
-func (c *Client) GetTicketsByDateRange(startDate, endDate string) (*TicketData, error) {
-	resp, err := c.doRequest(Request{
+// GetTicketsByDateRange gets tickets by creation date range (uses GET)
+func (c *Client) GetTicketsByDateRange(startDate, endDate string) (*SimpleTicketResponse, error) {
+	raw, err := c.doGetRequestRaw(Request{
 		Query:     "ticket",
 		Condition: "all",
 		Sort:      "creationDate",
@@ -355,12 +407,7 @@ func (c *Client) GetTicketsByDateRange(startDate, endDate string) (*TicketData, 
 		return nil, err
 	}
 
-	var data TicketData
-	if err := json.Unmarshal(resp.Data, &data); err != nil {
-		return nil, fmt.Errorf("failed to parse ticket data: %w", err)
-	}
-
-	return &data, nil
+	return parseTicketsResponse(raw)
 }
 
 // CreateTicketParams contains parameters for creating a ticket
@@ -468,9 +515,9 @@ func (c *Client) GetUserByID(id string) (*UserData, error) {
 	return &data, nil
 }
 
-// GetUserByEmail gets a user by email
+// GetUserByEmail gets a user by email (uses GET)
 func (c *Client) GetUserByEmail(email string) (*UserData, error) {
-	resp, err := c.doRequest(Request{
+	resp, err := c.doGetRequest(Request{
 		Query:      "user",
 		Condition:  "specific",
 		Sort:       "email",
@@ -588,8 +635,8 @@ func (c *Client) GetSLAs() (*SLAData, error) {
 	return &data, nil
 }
 
-// SearchTicketsByEmail searches tickets by user email
-func (c *Client) SearchTicketsByEmail(email string) (*TicketData, *User, error) {
+// SearchTicketsByEmail searches tickets by user email (uses GET)
+func (c *Client) SearchTicketsByEmail(email string) (*SimpleTicketResponse, *User, error) {
 	// First get the user
 	userData, err := c.GetUserByEmail(email)
 	if err != nil {
@@ -597,7 +644,7 @@ func (c *Client) SearchTicketsByEmail(email string) (*TicketData, *User, error) 
 	}
 
 	if len(userData.Users) == 0 {
-		return &TicketData{Total: 0, Tickets: [][]Ticket{}}, nil, nil
+		return &SimpleTicketResponse{Total: 0, Tickets: []map[string]interface{}{}}, nil, nil
 	}
 
 	user := userData.Users[0]
@@ -609,17 +656,17 @@ func (c *Client) SearchTicketsByEmail(email string) (*TicketData, *User, error) 
 	}
 
 	// Filter by user ID
-	var filtered [][]Ticket
-	for _, ticketGroup := range allTickets.Tickets {
-		for _, t := range ticketGroup {
-			if t.UserID == user.UserID {
-				filtered = append(filtered, ticketGroup)
-				break
+	var filtered []map[string]interface{}
+	for _, ticket := range allTickets.Tickets {
+		// Check user_id field (could be float64 from JSON)
+		if userID, ok := ticket["user_id"].(float64); ok {
+			if int(userID) == user.UserID {
+				filtered = append(filtered, ticket)
 			}
 		}
 	}
 
-	return &TicketData{
+	return &SimpleTicketResponse{
 		Total:   len(filtered),
 		Tickets: filtered,
 	}, &user, nil

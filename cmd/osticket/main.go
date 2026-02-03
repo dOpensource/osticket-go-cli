@@ -181,7 +181,6 @@ func ticketCmd() *cobra.Command {
 		Short: "Search tickets",
 		Run: func(cmd *cobra.Command, args []string) {
 			client := getClient()
-			jsonOut, _ := cmd.Flags().GetBool("json")
 			number, _ := cmd.Flags().GetString("number")
 			email, _ := cmd.Flags().GetString("email")
 			phone, _ := cmd.Flags().GetString("phone")
@@ -189,7 +188,7 @@ func ticketCmd() *cobra.Command {
 			from, _ := cmd.Flags().GetString("from")
 			to, _ := cmd.Flags().GetString("to")
 
-			// Handle search by number separately (uses GET, returns SimpleTicketResponse)
+			// Handle search by number
 			if number != "" {
 				data, err := client.GetTicket(number)
 				if err != nil {
@@ -200,16 +199,39 @@ func ticketCmd() *cobra.Command {
 				return
 			}
 
-			var data *api.TicketData
-			var user *api.User
-			var err error
-
+			// Handle search by email
 			if email != "" {
-				data, user, err = client.SearchTicketsByEmail(email)
-			} else if phone != "" {
+				data, user, err := client.SearchTicketsByEmail(email)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, red("Error:"), err)
+					os.Exit(1)
+				}
+				// Include user info in response
+				response := map[string]interface{}{
+					"total":   data.Total,
+					"tickets": data.Tickets,
+				}
+				if user != nil {
+					response["user"] = map[string]interface{}{
+						"user_id": user.UserID,
+						"name":    user.Name,
+						"created": user.Created,
+					}
+				}
+				printJSON(response)
+				return
+			}
+
+			if phone != "" {
 				fmt.Println(yellow("Phone search requires user lookup. Please search by email or ticket number instead."))
 				return
-			} else if from != "" && to != "" {
+			}
+
+			// Handle search by status or date range
+			var data *api.SimpleTicketResponse
+			var err error
+
+			if from != "" && to != "" {
 				data, err = client.GetTicketsByDateRange(from, to)
 			} else {
 				data, err = client.GetTicketsByStatus(status)
@@ -220,21 +242,7 @@ func ticketCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			if jsonOut {
-				printJSON(data)
-				return
-			}
-
-			if user != nil {
-				fmt.Printf("\n%s: %s (ID: %d)\n", cyan("User"), user.Name, user.UserID)
-			}
-
-			if len(data.Tickets) == 0 {
-				fmt.Println(yellow("No tickets found"))
-				return
-			}
-
-			displayTickets(data.Tickets)
+			printJSON(data)
 		},
 	}
 	searchCmd.Flags().String("number", "", "Search by ticket number")
@@ -243,7 +251,6 @@ func ticketCmd() *cobra.Command {
 	searchCmd.Flags().Int("status", 0, "Filter by status (0=all, 1=open, 2=resolved, 3=closed)")
 	searchCmd.Flags().String("from", "", "Start date (YYYY-MM-DD)")
 	searchCmd.Flags().String("to", "", "End date (YYYY-MM-DD)")
-	searchCmd.Flags().Bool("json", false, "Output as JSON")
 	cmd.AddCommand(searchCmd)
 
 	// ticket create
