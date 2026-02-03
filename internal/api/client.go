@@ -220,12 +220,42 @@ func (c *Client) GetTicket(id string) (*TicketData, error) {
 		return nil, err
 	}
 
+	// Try parsing as TicketData first ([][]Ticket format)
 	var data TicketData
-	if err := json.Unmarshal(resp.Data, &data); err != nil {
-		return nil, fmt.Errorf("failed to parse ticket data: %w", err)
+	if err := json.Unmarshal(resp.Data, &data); err == nil {
+		return &data, nil
 	}
 
-	return &data, nil
+	// Try parsing as flat ticket array ([]Ticket format)
+	var flatData struct {
+		Total   int      `json:"total"`
+		Tickets []Ticket `json:"tickets"`
+	}
+	if err := json.Unmarshal(resp.Data, &flatData); err == nil {
+		// Convert flat array to nested format for consistency
+		var nestedTickets [][]Ticket
+		for _, t := range flatData.Tickets {
+			nestedTickets = append(nestedTickets, []Ticket{t})
+		}
+		return &TicketData{
+			Total:   flatData.Total,
+			Tickets: nestedTickets,
+		}, nil
+	}
+
+	// Try parsing as single ticket object
+	var singleData struct {
+		Total  int    `json:"total"`
+		Ticket Ticket `json:"ticket"`
+	}
+	if err := json.Unmarshal(resp.Data, &singleData); err == nil {
+		return &TicketData{
+			Total:   singleData.Total,
+			Tickets: [][]Ticket{{singleData.Ticket}},
+		}, nil
+	}
+
+	return nil, fmt.Errorf("failed to parse ticket data: unexpected response format")
 }
 
 // GetTicketsByStatus gets tickets by status
