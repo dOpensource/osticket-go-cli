@@ -435,6 +435,39 @@ func (c *Client) GetTicketsByDateRange(startDate, endDate string) (*SimpleTicket
 	return parseTicketsResponse(raw)
 }
 
+// GetTicketsByStatusRaw gets tickets by status and returns raw response
+func (c *Client) GetTicketsByStatusRaw(status int) ([]byte, error) {
+	return c.doGetRequestRaw(Request{
+		Query:      "ticket",
+		Condition:  "all",
+		Sort:       "status",
+		Parameters: map[string]interface{}{"status": status},
+	})
+}
+
+// GetTicketsByDateRangeRaw gets tickets by date range and returns raw response
+func (c *Client) GetTicketsByDateRangeRaw(startDate, endDate string) ([]byte, error) {
+	return c.doGetRequestRaw(Request{
+		Query:     "ticket",
+		Condition: "all",
+		Sort:      "creationDate",
+		Parameters: map[string]interface{}{
+			"start_date": startDate,
+			"end_date":   endDate,
+		},
+	})
+}
+
+// GetUserByEmailRaw gets user by email and returns raw response
+func (c *Client) GetUserByEmailRaw(email string) ([]byte, error) {
+	return c.doGetRequestRaw(Request{
+		Query:      "user",
+		Condition:  "specific",
+		Sort:       "email",
+		Parameters: map[string]interface{}{"email": email},
+	})
+}
+
 // CreateTicketParams contains parameters for creating a ticket
 type CreateTicketParams struct {
 	Title      string

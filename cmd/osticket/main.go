@@ -181,6 +181,7 @@ func ticketCmd() *cobra.Command {
 		Short: "Search tickets",
 		Run: func(cmd *cobra.Command, args []string) {
 			client := getClient()
+			rawOut, _ := cmd.Flags().GetBool("raw")
 			number, _ := cmd.Flags().GetString("number")
 			email, _ := cmd.Flags().GetString("email")
 			phone, _ := cmd.Flags().GetString("phone")
@@ -190,6 +191,15 @@ func ticketCmd() *cobra.Command {
 
 			// Handle search by number
 			if number != "" {
+				if rawOut {
+					raw, err := client.GetTicketRaw(number)
+					if err != nil {
+						fmt.Fprintln(os.Stderr, red("Error:"), err)
+						os.Exit(1)
+					}
+					fmt.Println(string(raw))
+					return
+				}
 				data, err := client.GetTicket(number)
 				if err != nil {
 					fmt.Fprintln(os.Stderr, red("Error:"), err)
@@ -201,6 +211,26 @@ func ticketCmd() *cobra.Command {
 
 			// Handle search by email
 			if email != "" {
+				if rawOut {
+					// Raw mode: show user lookup then tickets lookup
+					raw, err := client.GetUserByEmailRaw(email)
+					if err != nil {
+						fmt.Fprintln(os.Stderr, red("Error getting user:"), err)
+						os.Exit(1)
+					}
+					fmt.Println("=== User Response ===")
+					fmt.Println(string(raw))
+					
+					raw2, err := client.GetTicketsByStatusRaw(0)
+					if err != nil {
+						fmt.Fprintln(os.Stderr, red("Error getting tickets:"), err)
+						os.Exit(1)
+					}
+					fmt.Println("\n=== Tickets Response ===")
+					fmt.Println(string(raw2))
+					return
+				}
+				
 				data, user, err := client.SearchTicketsByEmail(email)
 				if err != nil {
 					fmt.Fprintln(os.Stderr, red("Error:"), err)
@@ -228,6 +258,22 @@ func ticketCmd() *cobra.Command {
 			}
 
 			// Handle search by status or date range
+			if rawOut {
+				var raw []byte
+				var err error
+				if from != "" && to != "" {
+					raw, err = client.GetTicketsByDateRangeRaw(from, to)
+				} else {
+					raw, err = client.GetTicketsByStatusRaw(status)
+				}
+				if err != nil {
+					fmt.Fprintln(os.Stderr, red("Error:"), err)
+					os.Exit(1)
+				}
+				fmt.Println(string(raw))
+				return
+			}
+
 			var data *api.SimpleTicketResponse
 			var err error
 
@@ -245,6 +291,7 @@ func ticketCmd() *cobra.Command {
 			printJSON(data)
 		},
 	}
+	searchCmd.Flags().Bool("raw", false, "Output raw API response")
 	searchCmd.Flags().String("number", "", "Search by ticket number")
 	searchCmd.Flags().String("email", "", "Search by user email")
 	searchCmd.Flags().String("phone", "", "Search by user phone number")
