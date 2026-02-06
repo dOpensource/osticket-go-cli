@@ -188,6 +188,31 @@ func ticketCmd() *cobra.Command {
 			status, _ := cmd.Flags().GetInt("status")
 			from, _ := cmd.Flags().GetString("from")
 			to, _ := cmd.Flags().GetString("to")
+			term, _ := cmd.Flags().GetString("term")
+
+			// Handle search by term (requires date range)
+			if term != "" {
+				if from == "" || to == "" {
+					fmt.Fprintln(os.Stderr, red("Error:"), "--from and --to are required when using --term")
+					os.Exit(1)
+				}
+				if rawOut {
+					raw, err := client.SearchTicketsByTermRaw(term, from, to, status)
+					if err != nil {
+						fmt.Fprintln(os.Stderr, red("Error:"), err)
+						os.Exit(1)
+					}
+					fmt.Println(string(raw))
+					return
+				}
+				data, err := client.SearchTicketsByTerm(term, from, to, status)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, red("Error:"), err)
+					os.Exit(1)
+				}
+				printJSON(data)
+				return
+			}
 
 			// Handle search by number
 			if number != "" {
@@ -295,6 +320,7 @@ func ticketCmd() *cobra.Command {
 	searchCmd.Flags().String("number", "", "Search by ticket number")
 	searchCmd.Flags().String("email", "", "Search by user email")
 	searchCmd.Flags().String("phone", "", "Search by user phone number")
+	searchCmd.Flags().String("term", "", "Search by term in subject/body (requires --from and --to)")
 	searchCmd.Flags().Int("status", 0, "Filter by status (0=all, 1=open, 2=resolved, 3=closed)")
 	searchCmd.Flags().String("from", "", "Start date (YYYY-MM-DD)")
 	searchCmd.Flags().String("to", "", "End date (YYYY-MM-DD)")

@@ -79,6 +79,12 @@ osticket ticket search --status 1
 # Search tickets by date range
 osticket ticket search --from 2024-01-01 --to 2024-12-31
 
+# Search tickets by term (searches subject and body, requires date range)
+osticket ticket search --term "voicemail" --from 2024-01-01 --to 2024-12-31
+
+# Search by term with status filter
+osticket ticket search --term "password reset" --from 2024-01-01 --to 2024-06-30 --status 1
+
 # Output as JSON
 osticket ticket search --status 0 --json
 ```

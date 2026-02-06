@@ -492,6 +492,33 @@ func (c *Client) GetUserByEmailRaw(email string) ([]byte, error) {
 	})
 }
 
+// SearchTicketsByTerm searches tickets by term (subject/body) within a date range
+func (c *Client) SearchTicketsByTerm(term, startDate, endDate string, status int) (*SimpleTicketResponse, error) {
+	raw, err := c.SearchTicketsByTermRaw(term, startDate, endDate, status)
+	if err != nil {
+		return nil, err
+	}
+	return parseTicketsResponse(raw)
+}
+
+// SearchTicketsByTermRaw searches tickets by term and returns raw response
+func (c *Client) SearchTicketsByTermRaw(term, startDate, endDate string, status int) ([]byte, error) {
+	params := map[string]interface{}{
+		"term":       term,
+		"start_date": startDate,
+		"end_date":   endDate,
+	}
+	if status > 0 {
+		params["status"] = status
+	}
+	return c.doGetRequestRaw(Request{
+		Query:      "ticket",
+		Condition:  "all",
+		Sort:       "search",
+		Parameters: params,
+	})
+}
+
 // CreateTicketParams contains parameters for creating a ticket
 type CreateTicketParams struct {
 	Title      string
